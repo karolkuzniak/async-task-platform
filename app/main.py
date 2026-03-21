@@ -2,12 +2,13 @@ from fastapi import FastAPI
 from app.tasks import process_task
 from pydantic import BaseModel
 from app.database import engine, Base
-from app.model import Task
+from app.models import Task
+from app.database import SessionLocal
 
 class TaskRequest(BaseModel):
     data: str
 
-Base,metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 

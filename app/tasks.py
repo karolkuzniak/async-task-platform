@@ -1,17 +1,17 @@
 from celery import Celery
 import time
 from app.database import SessionLocal
-from app.model import Task
+from app.models import Task
 
 celery = Celery(
-    "worker"
-    broker="redis://localhost:6379/0"
+    "worker",
+    broker="redis://localhost:6379/0",
     backend="redis://localhost:6379/0"
 )
 
-@celery.task
-def process_task(data):
-    db = Sessionlocal()
+@celery.task(bind=True)
+def process_task(self, data):
+    db = SessionLocal()
 
     task = db.query(Task).filter(Task.id == self.request.id).first()
 
