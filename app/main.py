@@ -4,13 +4,27 @@ from pydantic import BaseModel
 from app.database import engine, Base
 from app.models import Task
 from app.database import SessionLocal
+import time
+from sqlalchemy.exc import OperationalError
+from prometheus_client import Counter, Histogram, generate_latest
+from fastapi.responses import Response
+
 
 class TaskRequest(BaseModel):
     data: str
 
-Base.metadata.create_all(bind=engine)
+for i in range(10):
+    try:
+        Base.metadata.create_all(bind=engine)
+        break
+    except OperationalError:
+        print("DB not ready, retrying... ")
+        time.sleep(2)
 
 app = FastAPI()
+
+REQUEST_COUNT = Counter("app_request_total", "Total request")
+REQUEST_TIME = Histogram("app_request_duration_seconds", "Request duration")
 
 @app.get("/")
 def root():
@@ -47,3 +61,19 @@ def get_task(task_id: str):
         "status": task.status,
         "result": task.result
     }
+
+@app.middleware("http")
+async def metrics_middleware(request, call_next):
+    start_time = time.time()
+
+    response = await call_next(request)
+
+    duration = time.time() - start_time
+    REQUEST_COUNT.inc()
+    REQUEST_TIME.obseve(duration)
+
+    return response
+
+@app.get("/metrics")
+def metrics():
+    return Response(generate_latest(), media_type="text/plain")

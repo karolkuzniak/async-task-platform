@@ -6,8 +6,10 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - redis
-      - db
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   worker:
     build:
@@ -15,7 +17,10 @@ services:
       dockerfile: docker/Dockerfile
     command: celery -A app.tasks worker --loglevel=info
     depends_on:
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   redis:
     image: redis:7
@@ -30,4 +35,20 @@ services:
       POSTGRES_DB: task_db
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9000:9000"
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
