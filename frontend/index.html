@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Async Task Dashboard</title>
+</head>
+<body>
+
+<h1>Task Dashboard</h1>
+
+<input id="taskInput" placeholder="Enter task data">
+<button onclick="createTask()">Create Task</button>
+
+<h2>Tasks</h2>
+<ul id="taskList"></ul>
+
+<script>
+async function createTask() {
+    const data = document.getElementById("taskInput").value;
+
+    await fetch("http://localhost:8000/task", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({data})
+    });
+
+    loadTasks();
+}
+
+async function loadTasks() {
+    const res = await fetch("http://localhost:8000/tasks");
+    const tasks = await res.json();
+
+    const list = document.getElementById("taskList");
+    list.innerHTML = "";
+
+    tasks.forEach(t => {
+        const li = document.createElement("li");
+        li.innerText = `${t.id} | ${t.status} | ${t.result || ""}`;
+        list.appendChild(li);
+    });
+}
+
+setInterval(loadTasks, 2000);
+</script>
+
+</body>
+</html>

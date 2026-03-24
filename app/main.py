@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from app.database import engine, Base
 from app.models import Task
 from app.database import SessionLocal
+import uuid
 import time
 from sqlalchemy.exc import OperationalError
 from prometheus_client import Counter, Histogram, generate_latest
@@ -34,18 +35,24 @@ def root():
 def create_task(payload: TaskRequest):
     db = SessionLocal()
 
-    task = process_task.delay(payload.data)
+    try:
+        task_id = str(uuid.uuid4())
 
-    db_task = Task(
-        id=task.id,
-        data=payload.data,
-        status="PENDING"
-    )
+        db_task = Task(
+            id=task_id,
+            data=payload.data,
+            status="PENDING"
+        )
 
-    db.add(db_task)
-    db.commit()
+        db.add(db_task)
+        db.commit()
 
-    return {"task_id": task.id}
+        process_task.delay(task_id, payload.data)
+
+        return {"task_id": task_id}
+
+    finally:
+        db.close()
 
 @app.get("/task/{task_id}")
 def get_task(task_id: str):
@@ -70,10 +77,28 @@ async def metrics_middleware(request, call_next):
 
     duration = time.time() - start_time
     REQUEST_COUNT.inc()
-    REQUEST_TIME.obseve(duration)
+    REQUEST_TIME.observe(duration)
 
     return response
 
 @app.get("/metrics")
 def metrics():
     return Response(generate_latest(), media_type="text/plain")
+
+
+@app.get("/tasks")
+def list_tasks():
+    db = SessionLocal()
+    try:
+        tasks = db.query(Task).all()
+
+        return [
+            {
+                "id": t.id,
+                "status": t.status,
+                "result": t.result
+            }
+            for t in tasks
+        ]
+    finally:
+        db.close()

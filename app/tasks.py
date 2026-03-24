@@ -9,23 +9,26 @@ celery = Celery(
     backend="redis://redis:6379/0"
 )
 
-@celery.task(bind=True)
-def process_task(self, task_id, data):
+@celery.task
+def process_task(task_id, data):
     db = SessionLocal()
+    try:
+        task = db.query(Task).filter(Task.id == task_id).first()
 
-    task = db.query(Task).filter(Task.id == task_id.id).first()
+        if task:
+            task.status = "STARTED"
+            db.commit()
 
-    if task:
-        task.status = "STARTED"
-        db.commit()
+        time.sleep(5)
 
-    time.sleep(5)
+        result = f"Processed: {data}"
 
-    result = f"Processed: {data}"
+        if task:
+            task.status = "SUCCESS"
+            task.result = result
+            db.commit()
 
-    if task:
-        task.status = "SUCCESS"
-        task.result = result
-        db.commit()
+        return result
 
-    return result
+    finally:
+        db.close()
