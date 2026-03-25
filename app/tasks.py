@@ -2,11 +2,13 @@ from celery import Celery
 import time
 from app.database import SessionLocal
 from app.models import Task
+import os
 
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 celery = Celery(
     "worker",
-    broker="redis://redis:6379/0",
-    backend="redis://redis:6379/0"
+    broker=REDIS_URL,
+    backend=REDIS_URL
 )
 
 @celery.task

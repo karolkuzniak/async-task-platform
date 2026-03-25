@@ -1,15 +1,17 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from app.tasks import process_task
 from pydantic import BaseModel
 from app.database import engine, Base
 from app.models import Task
 from app.database import SessionLocal
-import uuid
-import time
 from sqlalchemy.exc import OperationalError
 from prometheus_client import Counter, Histogram, generate_latest
 from fastapi.responses import Response
+import uuid
+import time
 
+app = FastAPI()
 
 class TaskRequest(BaseModel):
     data: str
@@ -21,8 +23,6 @@ for i in range(10):
     except OperationalError:
         print("DB not ready, retrying... ")
         time.sleep(2)
-
-app = FastAPI()
 
 REQUEST_COUNT = Counter("app_request_total", "Total request")
 REQUEST_TIME = Histogram("app_request_duration_seconds", "Request duration")
@@ -60,25 +60,26 @@ def get_task(task_id: str):
 
     task = db.query(Task).filter(Task.id == task_id).first()
 
+    db.close()
     if not task:
-        return {"error": "Task not found"}
-
+        raise HTTPException(status_code=404, detail="Task not found")
     return {
         "id": task.id,
         "status": task.status,
-        "result": task.result
+        "result": task.result,
+        "data": task.data
     }
 
 @app.middleware("http")
 async def metrics_middleware(request, call_next):
+    if request.url.path == "/metrics":
+        return await call_next(request)
+
     start_time = time.time()
-
     response = await call_next(request)
-
     duration = time.time() - start_time
     REQUEST_COUNT.inc()
     REQUEST_TIME.observe(duration)
-
     return response
 
 @app.get("/metrics")
@@ -96,9 +97,12 @@ def list_tasks():
             {
                 "id": t.id,
                 "status": t.status,
-                "result": t.result
+                "result": t.result,
+                "data": t.data
             }
             for t in tasks
         ]
     finally:
         db.close()
+
+app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
