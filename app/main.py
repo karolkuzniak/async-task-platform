@@ -27,10 +27,6 @@ for i in range(10):
 REQUEST_COUNT = Counter("app_request_total", "Total request")
 REQUEST_TIME = Histogram("app_request_duration_seconds", "Request duration")
 
-@app.get("/")
-def root():
-    return {"status": "ok"}
-
 @app.post("/task")
 def create_task(payload: TaskRequest):
     db = SessionLocal()
