@@ -279,4 +279,4 @@ Project demonstrates:
 * production-style API structure
 
 
-Author: https://github.com/karolkuzniak/
+https://github.com/karolkuzniak/
